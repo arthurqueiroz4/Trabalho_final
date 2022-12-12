@@ -15,13 +15,17 @@ struct pgm {
 void readPGMImage(struct pgm *, char *);
 void viewPGMImage(struct pgm *);
 void writePGMImage(struct pgm *, char *);
-char verificarMean(char []);
+char verificarMean(char *);
+char * calculaSCM(int *, struct pgm *, struct pgm *, int);
+void writeOutputSCM(int *, char *, int );
 
-int main() {
-
+int main(int argc, char *argv[]) {
+  FILE *txt;
+  txt = fopen("outscm.txt", "w");
   DIR *d, *d_mean;
+  int quantizacao = atoi(argv[1]);
   struct pgm img, img_mean;
-  struct dirent *dir, *dir_mean;
+  struct dirent *dir=NULL, *dir_mean=NULL;
   d = opendir("./images");
   d_mean = opendir("./images");
   rewinddir(d);
@@ -30,18 +34,20 @@ int main() {
   int k;
   clock_t begin, end;
   double time_per_img, time_total = 0;
-  // mean -> strcmp("mean", d_name);
-  char id[50], nome_arquivo[50], mean[10]="mean",itsmean, nome_arquivo_mean[50];
+  int *scm=NULL;
+  char id[50], nome_arquivo[50], mean[10]="mean",itsmean, nome_arquivo_mean[50], type;
+  unsigned char *outtxt;
   if (d) {
-    // while ((dir = readdir(d)) != NULL){
+    
     for (int i = 0; (dir = readdir(d)) != NULL; i += 2) {
 
-      begin = clock(); // 0 -> 3 -> 1 -> 5 -> 9 -> 7 -> 6 -> 10 -> 17 -> 13
+      begin = clock(); 
       cont += 1;
 
       if (i >= 3) {
 
         
+        type = dir->d_name[0];
         strncpy(id, dir->d_name + 2, 5);
         strcpy(nome_arquivo, dir->d_name);
         itsmean = verificarMean(nome_arquivo);
@@ -56,21 +62,18 @@ int main() {
           rewinddir(d_mean);
         } else {
           continue;
-        }
-        printf("nome do arquivo: %s \n", nome_arquivo);
-        printf("arquivo filtrado: %s\n", nome_arquivo_mean);
-        printf("id do arquivo: %s \n", id);
-        printf("tipo mean: %c", itsmean);
-        char saida[50] = "saida";
+        }        
         readPGMImage(&img, nome_arquivo);
-        
-        writePGMImage(&img, strcat(saida, nome_arquivo));
-        viewPGMImage(&img);
-        puts("-------------------------------------------");
-        /*if(strlen(dir->d_name) > 23){
-          puts("mean");
-        }*/
+        puts("");
+        readPGMImage(&img_mean, nome_arquivo_mean);        
+        outtxt = calculaSCM(scm,&img, &img_mean, quantizacao);
+        for(int i=0;i<quantizacao*quantizacao;i++){
+          fprintf(txt, "%hhu, ", *(outtxt + i));
+        }
+        fprintf(txt, "%c \n", type);       
+        puts("\n-------------------------------------------"); 
       }
+
       end = clock();
 
       time_per_img = (double)(end - begin) / CLOCKS_PER_SEC;
@@ -78,9 +81,10 @@ int main() {
       time_total += time_per_img;
     }
     closedir(d);
+    fclose(txt);
   }
   cont -= 2; // cont fica com o total de arquivos armazenado
-  printf("Tempo médio: %lf\n",
+  printf("Tempo medio: %lf\n",
          time_total / cont); // tempo total/total de arquivos(cont)
   printf("Tempo Total: %lf\n", time_total);
   return 0;
@@ -90,7 +94,7 @@ void readPGMImage(struct pgm *pio, char *filename) {
 
   FILE *fp;
   char ch;
-  char diretorio[50] = "images/";
+  char diretorio[100] = "images/";
 
   if (!(fp = fopen(strcat(diretorio, filename), "r"))) {
     perror("Erro.");
@@ -166,11 +170,47 @@ void viewPGMImage(struct pgm *pio) {
   printf("Max: %d\n", pio->mv);
 }
 
-char verificarMean(char nome_arquivo[50]){
+char verificarMean(char *nome_arquivo){
   char mean[50] = "mean";
   if (strstr(nome_arquivo, mean) != NULL) {
       return 's';
   } else {
       return 'n';
   }
+}
+
+char * calculaSCM(int *scm, struct pgm *pioA, struct pgm *pioB, int quant){
+  char *output = NULL;
+  int linha = pioA->r, coluna = pioA->c;
+  unsigned char *pdataA = pioA->pData, *pdataB = pioB->pData;
+  int *matrizA = NULL, *matrizB = NULL;
+  
+  scm = malloc(sizeof(int) * linha * coluna);
+  matrizA = malloc(sizeof(int)*linha*coluna);
+  matrizB = malloc(sizeof(int)*linha*coluna);
+  output = malloc(sizeof(char)*quant*quant);
+  
+  for(int i = 0; i < linha; i++){
+    for(int x = 0; x < coluna; x++){
+      *(matrizA + i * coluna + x) = *(pdataA + i * coluna + x) % quant;
+      *(matrizB + i * coluna + x) = *(pdataB + i * coluna + x) % quant;
+    }
+  }
+
+  for(int i = 0; i< quant; i++){
+    for(int x = 0; x < quant; x++){
+      *(scm + i * quant + x) = 0;
+    }
+  } 
+  for(int i = 0; i< linha; i++){
+    for(int x = 0; x < coluna; x++){
+      *(scm + *(matrizA + i * coluna + x) * quant + *(matrizB + i * coluna + x)) += 1;
+    }
+  } 
+  for(int i = 0; i< quant; i++){
+    for(int x = 0; x < quant; x++){
+      *(output + i * quant + x) = *(scm + i * quant + x);
+    }
+  }
+  return output;
 }
