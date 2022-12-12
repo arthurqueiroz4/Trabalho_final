@@ -64,8 +64,12 @@ int main(int argc, char *argv[]) {
           continue;
         }        
         readPGMImage(&img, nome_arquivo);
+        char saida[50] = "saida ";
+        writePGMImage(&img, saida);
         puts("");
-        readPGMImage(&img_mean, nome_arquivo_mean);        
+        readPGMImage(&img_mean, nome_arquivo_mean);  
+        char saidamean[50] = "saida-mean ";
+        writePGMImage(&img_mean, saidamean);      
         outtxt = calculaSCM(scm,&img, &img_mean, quantizacao);
         for(int i=0;i<quantizacao*quantizacao;i++){
           fprintf(txt, "%hhu, ", *(outtxt + i));
@@ -111,9 +115,11 @@ void readPGMImage(struct pgm *pio, char *filename) {
   fseek(fp, 1, SEEK_CUR);
 
   while ((ch = getc(fp)) == '#') {
-    while ((ch = getc(fp)) != '\n')
-      ;
+    while ((ch = getc(fp)) != '\n'){
+        fseek(fp, 1, SEEK_CUR);
+    }
   }
+  
 
   fseek(fp, -1, SEEK_CUR);
 
@@ -136,7 +142,7 @@ void readPGMImage(struct pgm *pio, char *filename) {
     }
     break;
   case 5:
-    puts("Lendo imagem PGM (dados em binário)");
+    puts("Lendo imagem PGM (dados em binario)");
     fread(pio->pData, sizeof(unsigned char), pio->r * pio->c, fp);
     break;
   default:
